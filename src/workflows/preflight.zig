@@ -16,13 +16,17 @@ const loadActiveAuthInfoForAccountRefresh = account_names.loadActiveAuthInfoForA
 pub fn isHandledCliError(err: anyerror) bool {
     return err == error.AccountNotFound or
         err == error.CodexLoginFailed or
+        err == error.EmailMismatch or
         err == error.ListLiveRequiresTty or
+        err == error.MissingEmail or
         err == error.TuiOutputUnavailable or
         err == error.NodeJsRequired or
         err == error.SwitchSelectionRequiresTty or
         err == error.AliasSelectionRequiresTty or
         err == error.InvalidAlias or
         err == error.DuplicateAlias or
+        err == error.InvalidBatchLoginInput or
+        err == error.BatchLoginFailed or
         err == error.RemoveConfirmationUnavailable or
         err == error.RemoveSelectionRequiresTty or
         err == error.InvalidRemoveSelectionInput;

@@ -189,6 +189,54 @@ fn writeSuccessfulFakeCodex(dir: fs.Dir) !void {
     }
 }
 
+fn writeSequentialFakeCodex(dir: fs.Dir) !void {
+    const script =
+        if (builtin.os.tag == .windows)
+            "@echo off\r\n" ++
+                "set \"COUNT_FILE=%HOME%\\fake-codex-count.txt\"\r\n" ++
+                "set \"COUNT=0\"\r\n" ++
+                "if exist \"%COUNT_FILE%\" set /p COUNT=<\"%COUNT_FILE%\"\r\n" ++
+                "set /a COUNT+=1\r\n" ++
+                "echo %COUNT%>\"%COUNT_FILE%\"\r\n" ++
+                ">>\"%HOME%\\fake-codex-argv.log\" echo %*\r\n" ++
+                "set \"CODEX_HOME_DIR=%CODEX_HOME%\"\r\n" ++
+                "if \"%CODEX_HOME_DIR%\"==\"\" set \"CODEX_HOME_DIR=%HOME%\\.codex\"\r\n" ++
+                "if not exist \"%CODEX_HOME_DIR%\" mkdir \"%CODEX_HOME_DIR%\"\r\n" ++
+                "if \"%COUNT%\"==\"1\" (\r\n" ++
+                "  copy /Y \"%HOME%\\fake-auth-1.json\" \"%CODEX_HOME_DIR%\\auth.json\" >NUL\r\n" ++
+                ") else (\r\n" ++
+                "  copy /Y \"%HOME%\\fake-auth-2.json\" \"%CODEX_HOME_DIR%\\auth.json\" >NUL\r\n" ++
+                ")\r\n" ++
+                "exit /b 0\r\n"
+        else
+            "#!/bin/sh\n" ++
+                "COUNT_FILE=\"$HOME/fake-codex-count.txt\"\n" ++
+                "if [ -f \"$COUNT_FILE\" ]; then\n" ++
+                "  COUNT=$(cat \"$COUNT_FILE\")\n" ++
+                "else\n" ++
+                "  COUNT=0\n" ++
+                "fi\n" ++
+                "COUNT=$((COUNT + 1))\n" ++
+                "printf '%s\\n' \"$COUNT\" > \"$COUNT_FILE\"\n" ++
+                "printf '%s\\n' \"$*\" >> \"$HOME/fake-codex-argv.log\"\n" ++
+                "CODEX_HOME_DIR=\"${CODEX_HOME:-$HOME/.codex}\"\n" ++
+                "mkdir -p \"$CODEX_HOME_DIR\"\n" ++
+                "if [ \"$COUNT\" -eq 1 ]; then\n" ++
+                "  cp \"$HOME/fake-auth-1.json\" \"$CODEX_HOME_DIR/auth.json\"\n" ++
+                "else\n" ++
+                "  cp \"$HOME/fake-auth-2.json\" \"$CODEX_HOME_DIR/auth.json\"\n" ++
+                "fi\n" ++
+                "exit 0\n";
+    const sub_path = fakeCodexCommandPath();
+    try dir.writeFile(.{ .sub_path = sub_path, .data = script });
+
+    if (builtin.os.tag != .windows) {
+        var file = try dir.openFile(sub_path, .{ .mode = .read_write });
+        defer file.close();
+        try file.chmod(0o755);
+    }
+}
+
 fn fakeNodeCommandPath() []const u8 {
     return if (builtin.os.tag == .windows) "fake-node-bin/node.cmd" else "fake-node-bin/node";
 }
@@ -777,6 +825,132 @@ test "Scenario: Given device auth login when running login then it forwards the 
     const active_auth = try fixtures.readFileAlloc(gpa, active_auth_path);
     defer gpa.free(active_auth);
     try std.testing.expectEqualStrings(fake_auth, active_auth);
+}
+
+test "Scenario: Given batch login file when running batch-login then it validates and imports the selected account" {
+    const gpa = std.testing.allocator;
+    const project_root = try projectRootAlloc(gpa);
+    defer gpa.free(project_root);
+    try buildCliBinary(gpa, project_root);
+
+    var tmp = fs.tmpDir(.{});
+    defer tmp.cleanup();
+
+    const home_root = try tmp.dir.realpathAlloc(gpa, ".");
+    defer gpa.free(home_root);
+    try tmp.dir.makePath(".codex");
+    try tmp.dir.makePath("fake-bin");
+
+    const expected_email = "batch-login-two@example.com";
+    const fake_auth = try fixtures.authJsonWithEmailPlan(gpa, expected_email, "plus");
+    defer gpa.free(fake_auth);
+    try tmp.dir.writeFile(.{ .sub_path = "fake-auth.json", .data = fake_auth });
+    try writeSuccessfulFakeCodex(tmp.dir);
+
+    try tmp.dir.writeFile(.{
+        .sub_path = "accounts.txt",
+        .data = "batch-login-one@example.com:service-pass:email-pass:fallback@example.net:fallback-pass\n" ++
+            "batch-login-two@example.com:service-pass:email-pass:fallback@example.net:fallback-pass\n",
+    });
+    const accounts_path = try tmp.dir.realpathAlloc(gpa, "accounts.txt");
+    defer gpa.free(accounts_path);
+
+    const fake_bin_path = try fs.path.join(gpa, &[_][]const u8{ home_root, "fake-bin" });
+    defer gpa.free(fake_bin_path);
+    const path_override = try prependPathEntryAlloc(gpa, fake_bin_path);
+    defer gpa.free(path_override);
+
+    const result = try runCliWithIsolatedHomeAndPath(
+        gpa,
+        project_root,
+        home_root,
+        path_override,
+        &[_][]const u8{ "batch-login", accounts_path, "--line", "2" },
+    );
+    defer gpa.free(result.stdout);
+    defer gpa.free(result.stderr);
+
+    try expectSuccess(result);
+
+    const argv_path = try fs.path.join(gpa, &[_][]const u8{ home_root, "fake-codex-argv.txt" });
+    defer gpa.free(argv_path);
+    const argv_data = try fixtures.readFileAlloc(gpa, argv_path);
+    defer gpa.free(argv_data);
+    try std.testing.expect(std.mem.indexOf(u8, argv_data, "login") != null);
+
+    const codex_home = try codexHomeAlloc(gpa, home_root);
+    defer gpa.free(codex_home);
+    var loaded = try registry.loadRegistry(gpa, codex_home);
+    defer loaded.deinit(gpa);
+    try std.testing.expectEqual(@as(usize, 1), loaded.accounts.items.len);
+    try std.testing.expect(std.mem.eql(u8, loaded.accounts.items[0].email, expected_email));
+
+    const expected_account_key = try fixtures.accountKeyForEmailAlloc(gpa, expected_email);
+    defer gpa.free(expected_account_key);
+    try std.testing.expect(std.mem.eql(u8, loaded.active_account_key.?, expected_account_key));
+}
+
+test "Scenario: Given batch login file when running batch-login then it starts a fresh login session for each selected account" {
+    const gpa = std.testing.allocator;
+    const project_root = try projectRootAlloc(gpa);
+    defer gpa.free(project_root);
+    try buildCliBinary(gpa, project_root);
+
+    var tmp = fs.tmpDir(.{});
+    defer tmp.cleanup();
+
+    const home_root = try tmp.dir.realpathAlloc(gpa, ".");
+    defer gpa.free(home_root);
+    try tmp.dir.makePath(".codex");
+    try tmp.dir.makePath("fake-bin");
+
+    const fake_auth_one = try fixtures.authJsonWithEmailPlan(gpa, "batch-two@example.com", "plus");
+    defer gpa.free(fake_auth_one);
+    try tmp.dir.writeFile(.{ .sub_path = "fake-auth-1.json", .data = fake_auth_one });
+    const fake_auth_two = try fixtures.authJsonWithEmailPlan(gpa, "batch-three@example.com", "plus");
+    defer gpa.free(fake_auth_two);
+    try tmp.dir.writeFile(.{ .sub_path = "fake-auth-2.json", .data = fake_auth_two });
+    try writeSequentialFakeCodex(tmp.dir);
+
+    try tmp.dir.writeFile(.{
+        .sub_path = "accounts.txt",
+        .data = "batch-one@example.com:service-pass:email-pass:fallback-one@example.net:fallback-pass\n" ++
+            "batch-two@example.com:service-pass:email-pass:fallback-two@example.net:fallback-pass\n" ++
+            "batch-three@example.com:service-pass:email-pass:fallback-three@example.net:fallback-pass\n",
+    });
+    const accounts_path = try tmp.dir.realpathAlloc(gpa, "accounts.txt");
+    defer gpa.free(accounts_path);
+
+    const fake_bin_path = try fs.path.join(gpa, &[_][]const u8{ home_root, "fake-bin" });
+    defer gpa.free(fake_bin_path);
+    const path_override = try prependPathEntryAlloc(gpa, fake_bin_path);
+    defer gpa.free(path_override);
+
+    const result = try runCliWithIsolatedHomeAndPath(
+        gpa,
+        project_root,
+        home_root,
+        path_override,
+        &[_][]const u8{ "batch-login", accounts_path, "--from-line", "2" },
+    );
+    defer gpa.free(result.stdout);
+    defer gpa.free(result.stderr);
+
+    try expectSuccess(result);
+
+    const argv_path = try fs.path.join(gpa, &[_][]const u8{ home_root, "fake-codex-argv.log" });
+    defer gpa.free(argv_path);
+    const argv_data = try fixtures.readFileAlloc(gpa, argv_path);
+    defer gpa.free(argv_data);
+
+    var login_invocations: usize = 0;
+    var lines = std.mem.splitScalar(u8, argv_data, '\n');
+    while (lines.next()) |line| {
+        if (std.mem.trim(u8, line, &std.ascii.whitespace).len == 0) continue;
+        login_invocations += 1;
+        try std.testing.expect(std.mem.indexOf(u8, line, "login") != null);
+    }
+    try std.testing.expectEqual(@as(usize, 2), login_invocations);
 }
 
 test "Scenario: Given CODEX_HOME override when running login then it stores auth state under the override root" {

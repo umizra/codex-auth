@@ -12,6 +12,12 @@ pub const ListOptions = struct {
 pub const LoginOptions = struct {
     device_auth: bool = false,
 };
+pub const BatchLoginOptions = struct {
+    accounts_path: []u8,
+    line_number: ?usize,
+    from_line_number: ?usize,
+    device_auth: bool = false,
+};
 pub const ImportSource = enum { standard, cpa };
 pub const ImportOptions = struct {
     auth_path: ?[]u8,
@@ -58,6 +64,7 @@ pub const HelpTopic = enum {
     top_level,
     list,
     login,
+    batch_login,
     import_auth,
     export_auth,
     switch_account,
@@ -70,6 +77,7 @@ pub const HelpTopic = enum {
 pub const Command = union(enum) {
     list: ListOptions,
     login: LoginOptions,
+    batch_login: BatchLoginOptions,
     import_auth: ImportOptions,
     export_auth: ExportOptions,
     switch_account: SwitchOptions,

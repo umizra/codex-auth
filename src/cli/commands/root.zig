@@ -4,6 +4,7 @@ const common = @import("common.zig");
 
 const alias = @import("alias.zig");
 const clean = @import("clean.zig");
+const batch_login = @import("batch_login.zig");
 const config = @import("config.zig");
 const export_auth = @import("export.zig");
 const import_auth = @import("import.zig");
@@ -40,6 +41,7 @@ pub fn parseArgs(allocator: std.mem.Allocator, args: []const [:0]const u8) !type
 
     if (std.mem.eql(u8, cmd, "list")) return list.parse(allocator, args[2..]);
     if (std.mem.eql(u8, cmd, "login")) return login.parse(allocator, args[2..]);
+    if (std.mem.eql(u8, cmd, "batch-login")) return batch_login.parse(allocator, args[2..]);
     if (std.mem.eql(u8, cmd, "import")) return import_auth.parse(allocator, args[2..]);
     if (std.mem.eql(u8, cmd, "export")) return export_auth.parse(allocator, args[2..]);
     if (std.mem.eql(u8, cmd, "switch")) return switch_account.parse(allocator, args[2..]);
@@ -65,6 +67,7 @@ fn freeCommand(allocator: std.mem.Allocator, cmd: *types.Command) void {
         .export_auth => |opts| {
             if (opts.dest_path) |path| allocator.free(path);
         },
+        .batch_login => |opts| allocator.free(opts.accounts_path),
         .switch_account => |opts| {
             if (opts.query) |query| allocator.free(query);
         },
@@ -100,6 +103,7 @@ fn parseHelpArgs(allocator: std.mem.Allocator, rest: []const [:0]const u8) !type
 fn helpTopicForName(name: []const u8) ?types.HelpTopic {
     if (std.mem.eql(u8, name, "list")) return .list;
     if (std.mem.eql(u8, name, "login")) return .login;
+    if (std.mem.eql(u8, name, "batch-login")) return .batch_login;
     if (std.mem.eql(u8, name, "import")) return .import_auth;
     if (std.mem.eql(u8, name, "export")) return .export_auth;
     if (std.mem.eql(u8, name, "switch")) return .switch_account;

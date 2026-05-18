@@ -38,6 +38,7 @@ pub fn writeHelp(
     try writeCommandSummary(out, use_color, "--version, -V", "Show version");
     try writeCommandSummary(out, use_color, "list [--live] [--active] [--api|--skip-api]", "List available accounts");
     try writeCommandSummary(out, use_color, "login [--device-auth]", "Login and add the current account");
+    try writeCommandSummary(out, use_color, "batch-login <path> [--line <n>|--from-line <n>] [--device-auth]", "Login accounts from a file");
     try writeCommandSummary(out, use_color, "import", "Import auth files or rebuild registry");
     try writeCommandDetail(out, use_color, "import <path> [--alias <alias>]");
     try writeCommandDetail(out, use_color, "import --cpa [<path>] [--alias <alias>]");
@@ -124,6 +125,7 @@ fn commandNameForTopic(topic: HelpTopic) []const u8 {
         .top_level => "",
         .list => "list",
         .login => "login",
+        .batch_login => "batch-login",
         .import_auth => "import",
         .export_auth => "export",
         .switch_account => "switch",
@@ -139,6 +141,7 @@ fn commandDescriptionForTopic(topic: HelpTopic) []const u8 {
         .top_level => "Command-line account management for Codex.",
         .list => "List available accounts.",
         .login => "Run `codex login` or `codex login --device-auth`, then add the current account.",
+        .batch_login => "Run repeated fresh `codex login` flows for one or more file lines, then add each account.",
         .import_auth => "Import auth files or rebuild the registry.",
         .export_auth => "Export stored account auth files.",
         .switch_account => "Switch the active account by alias, email, display number, or partial query.",
@@ -151,14 +154,14 @@ fn commandDescriptionForTopic(topic: HelpTopic) []const u8 {
 
 fn commandHelpHasExamples(topic: HelpTopic) bool {
     return switch (topic) {
-        .import_auth, .export_auth, .switch_account, .remove_account, .alias, .config => true,
+        .import_auth, .export_auth, .switch_account, .remove_account, .alias, .batch_login, .config => true,
         else => false,
     };
 }
 
 fn commandHelpHasOptions(topic: HelpTopic) bool {
     return switch (topic) {
-        .list, .login, .import_auth, .export_auth, .switch_account, .remove_account, .alias, .config => true,
+        .list, .login, .batch_login, .import_auth, .export_auth, .switch_account, .remove_account, .alias, .config => true,
         else => false,
     };
 }
@@ -191,6 +194,9 @@ fn writeUsageLines(out: *std.Io.Writer, topic: HelpTopic) !void {
         .login => {
             try out.writeAll("  codex-auth login\n");
             try out.writeAll("  codex-auth login --device-auth\n");
+        },
+        .batch_login => {
+            try out.writeAll("  codex-auth batch-login <path> [--line <n>|--from-line <n>] [--device-auth]\n");
         },
         .import_auth => {
             try out.writeAll("  codex-auth import <path> [--alias <alias>]\n");
@@ -229,6 +235,7 @@ pub fn helpCommandForTopic(topic: HelpTopic) []const u8 {
         .top_level => "codex-auth --help",
         .list => "codex-auth list --help",
         .login => "codex-auth login --help",
+        .batch_login => "codex-auth batch-login --help",
         .import_auth => "codex-auth import --help",
         .export_auth => "codex-auth export --help",
         .switch_account => "codex-auth switch --help",
@@ -255,6 +262,12 @@ fn writeOptionLines(out: *std.Io.Writer, topic: HelpTopic) !void {
         },
         .login => {
             try out.writeAll("  --device-auth   Run `codex login --device-auth` before adding the account.\n");
+        },
+        .batch_login => {
+            try out.writeAll("  <path>           Path to an accounts file with colon-separated lines.\n");
+            try out.writeAll("  --line <n>       Process only line n (1-based) from the file.\n");
+            try out.writeAll("  --from-line <n>  Process every usable line starting at n (1-based).\n");
+            try out.writeAll("  --device-auth    Run `codex login --device-auth` before syncing the account.\n");
         },
         .import_auth => {
             try out.writeAll("  <path>           Import one auth file or every supported auth file in a directory.\n");
@@ -318,6 +331,12 @@ fn writeExampleLines(out: *std.Io.Writer, topic: HelpTopic) !void {
         .login => {
             try out.writeAll("  codex-auth login\n");
             try out.writeAll("  codex-auth login --device-auth\n");
+        },
+        .batch_login => {
+            try out.writeAll("  codex-auth batch-login /path/to/accounts.txt\n");
+            try out.writeAll("  codex-auth batch-login /path/to/accounts.txt --line 2\n");
+            try out.writeAll("  codex-auth batch-login /path/to/accounts.txt --from-line 2\n");
+            try out.writeAll("  codex-auth batch-login /path/to/accounts.txt --device-auth\n");
         },
         .import_auth => {
             try out.writeAll("  codex-auth import /path/to/auth.json --alias personal\n");

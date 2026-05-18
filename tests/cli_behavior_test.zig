@@ -337,6 +337,7 @@ test "Scenario: Given help when rendering then login and command help notes are 
     const help = aw.written();
     try std.testing.expect(std.mem.indexOf(u8, help, "Commands:") != null);
     try std.testing.expect(std.mem.indexOf(u8, help, "list [--live] [--active] [--api|--skip-api]") != null);
+    try std.testing.expect(std.mem.indexOf(u8, help, "batch-login <path> [--line <n>|--from-line <n>] [--device-auth]") != null);
     try std.testing.expect(std.mem.indexOf(u8, help, "switch [--live] [--api|--skip-api]") != null);
     try std.testing.expect(std.mem.indexOf(u8, help, "alias set <alias|email|display-number|query> <alias>") != null);
     try std.testing.expect(std.mem.indexOf(u8, help, "config live --interval <seconds>") != null);
@@ -694,6 +695,76 @@ test "Scenario: Given login help when rendering then device auth usage is includ
     const help = aw.written();
     try std.testing.expect(std.mem.indexOf(u8, help, "codex-auth login --device-auth") != null);
     try std.testing.expect(std.mem.indexOf(u8, help, "Options:\n  --device-auth   Run `codex login --device-auth` before adding the account.") != null);
+}
+
+test "Scenario: Given batch login help when rendering then file usage is included" {
+    const gpa = std.testing.allocator;
+    var aw: std.Io.Writer.Allocating = .init(gpa);
+    defer aw.deinit();
+
+    try cli.help.writeCommandHelp(&aw.writer, false, .batch_login);
+
+    const help = aw.written();
+    try std.testing.expect(std.mem.indexOf(u8, help, "codex-auth batch-login") != null);
+    try std.testing.expect(std.mem.indexOf(u8, help, "batch-login <path> [--line <n>|--from-line <n>] [--device-auth]") != null);
+    try std.testing.expect(std.mem.indexOf(u8, help, "Path to an accounts file with colon-separated lines.") != null);
+    try std.testing.expect(std.mem.indexOf(u8, help, "codex-auth batch-login /path/to/accounts.txt --line 2") != null);
+    try std.testing.expect(std.mem.indexOf(u8, help, "codex-auth batch-login /path/to/accounts.txt --from-line 2") != null);
+}
+
+test "Scenario: Given batch login with file path and line when parsing then options are preserved" {
+    const gpa = std.testing.allocator;
+    const args = [_][:0]const u8{ "codex-auth", "batch-login", "/tmp/accounts.txt", "--line", "3", "--device-auth" };
+    var result = try cli.commands.parseArgs(gpa, &args);
+    defer cli.commands.freeParseResult(gpa, &result);
+
+    switch (result) {
+        .command => |cmd| switch (cmd) {
+            .batch_login => |opts| {
+                try std.testing.expectEqualStrings("/tmp/accounts.txt", opts.accounts_path);
+                try std.testing.expectEqual(@as(?usize, 3), opts.line_number);
+                try std.testing.expectEqual(@as(?usize, null), opts.from_line_number);
+                try std.testing.expect(opts.device_auth);
+            },
+            else => return error.TestExpectedEqual,
+        },
+        else => return error.TestExpectedEqual,
+    }
+}
+
+test "Scenario: Given batch login with from-line when parsing then options are preserved" {
+    const gpa = std.testing.allocator;
+    const args = [_][:0]const u8{ "codex-auth", "batch-login", "/tmp/accounts.txt", "--from-line", "2" };
+    var result = try cli.commands.parseArgs(gpa, &args);
+    defer cli.commands.freeParseResult(gpa, &result);
+
+    switch (result) {
+        .command => |cmd| switch (cmd) {
+            .batch_login => |opts| {
+                try std.testing.expectEqualStrings("/tmp/accounts.txt", opts.accounts_path);
+                try std.testing.expectEqual(@as(?usize, null), opts.line_number);
+                try std.testing.expectEqual(@as(?usize, 2), opts.from_line_number);
+                try std.testing.expect(!opts.device_auth);
+            },
+            else => return error.TestExpectedEqual,
+        },
+        else => return error.TestExpectedEqual,
+    }
+}
+
+test "Scenario: Given batch login with line and from-line when parsing then usage error is returned" {
+    const gpa = std.testing.allocator;
+    const args = [_][:0]const u8{ "codex-auth", "batch-login", "/tmp/accounts.txt", "--line", "1", "--from-line", "2" };
+    var result = try cli.commands.parseArgs(gpa, &args);
+    defer cli.commands.freeParseResult(gpa, &result);
+
+    switch (result) {
+        .usage_error => |usage| {
+            try std.testing.expectEqual(.batch_login, usage.topic);
+            try std.testing.expect(std.mem.indexOf(u8, usage.message, "cannot be combined") != null);
+        },
+        else => return error.TestExpectedEqual,
+    }
 }
 
 test "Scenario: Given login options when building codex argv then device auth is forwarded" {

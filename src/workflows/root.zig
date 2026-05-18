@@ -18,6 +18,7 @@ const clean_workflow = @import("clean.zig");
 const config_workflow = @import("config.zig");
 const list_workflow = @import("list.zig");
 const login_workflow = @import("login.zig");
+const batch_login_workflow = @import("batch_login.zig");
 const import_workflow = @import("import.zig");
 const export_workflow = @import("export.zig");
 const switch_workflow = @import("switch.zig");
@@ -141,6 +142,7 @@ fn runMain(init: std.process.Init.Minimal) !void {
         .config => |opts| try config_workflow.handleConfig(allocator, codex_home.?, opts),
         .list => |opts| try list_workflow.handleList(allocator, codex_home.?, opts),
         .login => |opts| try login_workflow.handleLogin(allocator, codex_home.?, opts),
+        .batch_login => |opts| try batch_login_workflow.handleBatchLogin(allocator, codex_home.?, opts),
         .import_auth => |opts| try import_workflow.handleImport(allocator, codex_home.?, opts),
         .export_auth => |opts| try export_workflow.handleExport(allocator, codex_home.?, opts),
         .switch_account => |opts| try switch_workflow.handleSwitch(allocator, codex_home.?, opts),

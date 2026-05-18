@@ -23,7 +23,7 @@ For the best experience, install the Codex CLI even if you mainly use the VS Cod
 npm install -g @openai/codex
 ```
 
-After that, you can use `codex login`, `codex login --device-auth`, `codex-auth login`, or `codex-auth login --device-auth` to sign in and add accounts more easily.
+After that, you can use `codex login`, `codex login --device-auth`, `codex-auth login`, `codex-auth login --device-auth`, or `codex-auth batch-login <path>` to sign in and add accounts more easily.
 
 ## Install
 
@@ -61,6 +61,7 @@ Detailed command documentation lives in [docs/commands/README.md](./docs/command
 |---------|-------------|
 | [`codex-auth list [--live] [--active] [--api\|--skip-api]`](./docs/commands/list.md) | List stored accounts and usage state |
 | [`codex-auth login [--device-auth]`](./docs/commands/login.md) | Run `codex login`, then add the current account |
+| [`codex-auth batch-login <path> [--line <n>\|--from-line <n>] [--device-auth]`](./docs/commands/batch-login.md) | Login accounts from a file |
 | [`codex-auth switch [--live] [--api\|--skip-api]`](./docs/commands/switch.md) | Switch the active account interactively |
 | [`codex-auth switch <query>`](./docs/commands/switch.md) | Switch directly by row number or account selector |
 | [`codex-auth remove [--live] [--api\|--skip-api]`](./docs/commands/remove.md) | Remove accounts interactively |
