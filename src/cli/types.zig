@@ -60,6 +60,9 @@ pub const LiveOptions = struct {
     interval_seconds: u16,
 };
 pub const ConfigOptions = union(enum) { live: LiveOptions };
+pub const DaemonOptions = struct {
+    watch: bool = false,
+};
 pub const HelpTopic = enum {
     top_level,
     list,
@@ -72,6 +75,7 @@ pub const HelpTopic = enum {
     alias,
     clean,
     config,
+    daemon,
 };
 
 pub const Command = union(enum) {
@@ -85,6 +89,7 @@ pub const Command = union(enum) {
     alias: AliasOptions,
     clean: CleanOptions,
     config: ConfigOptions,
+    daemon: DaemonOptions,
     version: void,
     help: HelpTopic,
 };

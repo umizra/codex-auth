@@ -6,6 +6,7 @@ const alias = @import("alias.zig");
 const clean = @import("clean.zig");
 const batch_login = @import("batch_login.zig");
 const config = @import("config.zig");
+const daemon = @import("daemon.zig");
 const export_auth = @import("export.zig");
 const import_auth = @import("import.zig");
 const list = @import("list.zig");
@@ -49,6 +50,7 @@ pub fn parseArgs(allocator: std.mem.Allocator, args: []const [:0]const u8) !type
     if (std.mem.eql(u8, cmd, "alias")) return alias.parse(allocator, args[2..]);
     if (std.mem.eql(u8, cmd, "clean")) return clean.parse(allocator, args[2..]);
     if (std.mem.eql(u8, cmd, "config")) return config.parse(allocator, args[2..]);
+    if (std.mem.eql(u8, cmd, "daemon")) return daemon.parse(allocator, args[2..]);
 
     return common.usageErrorResult(allocator, .top_level, "unknown command `{s}`.", .{cmd});
 }
@@ -111,5 +113,6 @@ fn helpTopicForName(name: []const u8) ?types.HelpTopic {
     if (std.mem.eql(u8, name, "alias")) return .alias;
     if (std.mem.eql(u8, name, "clean")) return .clean;
     if (std.mem.eql(u8, name, "config")) return .config;
+    if (std.mem.eql(u8, name, "daemon")) return .daemon;
     return null;
 }

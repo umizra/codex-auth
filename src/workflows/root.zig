@@ -16,6 +16,7 @@ const live_flow = @import("live.zig");
 const help_workflow = @import("help.zig");
 const clean_workflow = @import("clean.zig");
 const config_workflow = @import("config.zig");
+const daemon_workflow = @import("daemon.zig");
 const list_workflow = @import("list.zig");
 const login_workflow = @import("login.zig");
 const batch_login_workflow = @import("batch_login.zig");
@@ -140,6 +141,7 @@ fn runMain(init: std.process.Init.Minimal) !void {
             else => try cli.help.printCommandHelp(topic),
         },
         .config => |opts| try config_workflow.handleConfig(allocator, codex_home.?, opts),
+        .daemon => |opts| try daemon_workflow.handleDaemon(allocator, codex_home.?, opts),
         .list => |opts| try list_workflow.handleList(allocator, codex_home.?, opts),
         .login => |opts| try login_workflow.handleLogin(allocator, codex_home.?, opts),
         .batch_login => |opts| try batch_login_workflow.handleBatchLogin(allocator, codex_home.?, opts),

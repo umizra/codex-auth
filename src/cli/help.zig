@@ -58,6 +58,7 @@ pub fn writeHelp(
     try writeCommandDetail(out, use_color, "clean background");
     try writeCommandSummary(out, use_color, "config", "Manage configuration");
     try writeCommandDetail(out, use_color, "config live --interval <seconds>");
+    try writeCommandSummary(out, use_color, "daemon [--watch]", "Run non-interactive auto-switch checks");
 
     try out.writeAll("\n");
     if (use_color) try out.writeAll(style.ansi.cyan);
@@ -133,6 +134,7 @@ fn commandNameForTopic(topic: HelpTopic) []const u8 {
         .alias => "alias",
         .clean => "clean",
         .config => "config",
+        .daemon => "daemon",
     };
 }
 
@@ -149,19 +151,20 @@ fn commandDescriptionForTopic(topic: HelpTopic) []const u8 {
         .alias => "Set or clear an account alias by alias, email, display number, or partial query.",
         .clean => "Delete backup and stale files under accounts/.",
         .config => "Manage live refresh configuration.",
+        .daemon => "Run non-interactive auto-switch checks.",
     };
 }
 
 fn commandHelpHasExamples(topic: HelpTopic) bool {
     return switch (topic) {
-        .import_auth, .export_auth, .switch_account, .remove_account, .alias, .batch_login, .config => true,
+        .import_auth, .export_auth, .switch_account, .remove_account, .alias, .batch_login, .config, .daemon => true,
         else => false,
     };
 }
 
 fn commandHelpHasOptions(topic: HelpTopic) bool {
     return switch (topic) {
-        .list, .login, .batch_login, .import_auth, .export_auth, .switch_account, .remove_account, .alias, .config => true,
+        .list, .login, .batch_login, .import_auth, .export_auth, .switch_account, .remove_account, .alias, .config, .daemon => true,
         else => false,
     };
 }
@@ -227,6 +230,9 @@ fn writeUsageLines(out: *std.Io.Writer, topic: HelpTopic) !void {
         .config => {
             try out.writeAll("  codex-auth config live --interval <seconds>\n");
         },
+        .daemon => {
+            try out.writeAll("  codex-auth daemon [--watch]\n");
+        },
     }
 }
 
@@ -243,6 +249,7 @@ pub fn helpCommandForTopic(topic: HelpTopic) []const u8 {
         .alias => "codex-auth alias --help",
         .clean => "codex-auth clean --help",
         .config => "codex-auth config --help",
+        .daemon => "codex-auth daemon --help",
     };
 }
 
@@ -303,6 +310,9 @@ fn writeOptionLines(out: *std.Io.Writer, topic: HelpTopic) !void {
         .config => {
             try out.writeAll("  live --interval <seconds>\n");
             try out.writeAll("                    Set the live TUI refresh interval from 5 to 3600 seconds.\n");
+        },
+        .daemon => {
+            try out.writeAll("  --watch           Keep running and repeat auto-switch checks at the configured interval.\n");
         },
         else => {},
     }
@@ -380,6 +390,10 @@ fn writeExampleLines(out: *std.Io.Writer, topic: HelpTopic) !void {
         },
         .config => {
             try out.writeAll("  codex-auth config live --interval 60\n");
+        },
+        .daemon => {
+            try out.writeAll("  codex-auth daemon\n");
+            try out.writeAll("  codex-auth daemon --watch\n");
         },
     }
 }

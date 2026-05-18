@@ -27,6 +27,7 @@ pub fn isHandledCliError(err: anyerror) bool {
         err == error.DuplicateAlias or
         err == error.InvalidBatchLoginInput or
         err == error.BatchLoginFailed or
+        err == error.InvalidCliUsage or
         err == error.RemoveConfirmationUnavailable or
         err == error.RemoveSelectionRequiresTty or
         err == error.InvalidRemoveSelectionInput;
