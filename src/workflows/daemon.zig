@@ -2,6 +2,8 @@ const std = @import("std");
 const app_runtime = @import("../core/runtime.zig");
 const registry = @import("../registry/root.zig");
 
+const auto_switch_threshold_percent: i64 = 10;
+
 fn usageScoreForAccount(rec: *const registry.AccountRecord, now: i64) i64 {
     return registry.usageScoreAt(rec.last_usage, now) orelse -1;
 }
@@ -10,7 +12,7 @@ fn shouldSwitchActive(reg: *registry.Registry, now: i64) bool {
     const active_key = reg.active_account_key orelse return reg.accounts.items.len > 0;
     const active_idx = registry.findAccountIndexByAccountKey(reg, active_key) orelse return reg.accounts.items.len > 0;
     const score = registry.usageScoreAt(reg.accounts.items[active_idx].last_usage, now) orelse return false;
-    return score <= 0;
+    return score <= auto_switch_threshold_percent;
 }
 
 fn bestSwitchTargetIndex(reg: *registry.Registry, now: i64) ?usize {
@@ -24,7 +26,7 @@ fn bestSwitchTargetIndex(reg: *registry.Registry, now: i64) ?usize {
             if (std.mem.eql(u8, rec.account_key, key)) continue;
         }
         const score = usageScoreForAccount(&rec, now);
-        if (score <= 0) continue;
+        if (score <= auto_switch_threshold_percent) continue;
         const seen = rec.last_usage_at orelse -1;
         if (best_idx == null or score > best_score or (score == best_score and seen > best_seen)) {
             best_idx = idx;
