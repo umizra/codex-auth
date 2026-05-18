@@ -3,7 +3,7 @@ const registry = @import("../registry/root.zig");
 const sessions = @import("../session.zig");
 const usage_api = @import("../api/usage.zig");
 
-const foreground_usage_refresh_concurrency: usize = 5;
+const foreground_usage_refresh_concurrency: usize = 10;
 pub const max_usage_override_display_width: usize = 25;
 pub const UsageFetchDetailedFn = *const fn (
     allocator: std.mem.Allocator,
