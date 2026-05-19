@@ -65,6 +65,9 @@ pub fn freeParseResult(allocator: std.mem.Allocator, result: *types.ParseResult)
 
 fn freeCommand(allocator: std.mem.Allocator, cmd: *types.Command) void {
     switch (cmd.*) {
+        .list => |opts| {
+            if (opts.query) |query| allocator.free(query);
+        },
         .import_auth => |opts| common.freeImportOptions(allocator, opts.auth_path, opts.alias),
         .export_auth => |opts| {
             if (opts.dest_path) |path| allocator.free(path);

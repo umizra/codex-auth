@@ -1380,7 +1380,7 @@ test "Scenario: Given Windows console labels when rendering unicode-prone output
         removeTuiFooterText(true),
     );
     try std.testing.expectEqualStrings(
-        "Keys: Up/Down scroll, PgUp/PgDn page, Home/End jump, Esc or q quit\n",
+        "Keys: Up/Down scroll, PgUp/PgDn page, 0 nonzero, a available, e errors, c clear, Esc or q quit\n",
         listTuiFooterText(true),
     );
     try std.testing.expectEqualStrings("[+]", importReportMarker(.imported, true));
@@ -1398,7 +1398,7 @@ test "Scenario: Given non-Windows console labels when rendering unicode-prone ou
         removeTuiFooterText(false),
     );
     try std.testing.expectEqualStrings(
-        "Keys: ↑/↓ scroll, PgUp/PgDn page, Home/End jump, Esc or q quit\n",
+        "Keys: ↑/↓ scroll, PgUp/PgDn page, 0 nonzero, a available, e errors, c clear, Esc or q quit\n",
         listTuiFooterText(false),
     );
     try std.testing.expectEqualStrings("✓", importReportMarker(.imported, false));

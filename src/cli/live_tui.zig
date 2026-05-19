@@ -1,5 +1,6 @@
 const std = @import("std");
 const app_runtime = @import("../core/runtime.zig");
+const list_filter = @import("../list_filter.zig");
 const registry = @import("../registry/root.zig");
 const picker = @import("picker.zig");
 const render = @import("render.zig");
@@ -278,6 +279,31 @@ pub const RowsCache = struct {
         var rows = try buildSelectableRows(allocator, display);
         errdefer rows.deinit(allocator);
         self.rows = rows;
+        return &self.rows.?;
+    }
+
+    pub fn ensureFiltered(
+        self: *RowsCache,
+        allocator: std.mem.Allocator,
+        display: selection.SwitchSelectionDisplay,
+        filter_options: list_filter.Options,
+    ) !*row_data.SwitchRows {
+        if (self.rows) |*rows| return rows;
+        const now = nowSecond();
+        const indices = try list_filter.filterAccountIndices(
+            allocator,
+            display.reg,
+            display.usage_overrides,
+            filter_options,
+            now,
+        );
+        defer allocator.free(indices);
+        self.rows = try row_data.buildSwitchRowsFromIndicesWithUsageOverrides(
+            allocator,
+            display.reg,
+            indices,
+            display.usage_overrides,
+        );
         return &self.rows.?;
     }
 };

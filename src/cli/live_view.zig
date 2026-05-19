@@ -1,6 +1,7 @@
 const std = @import("std");
 const app_runtime = @import("../core/runtime.zig");
 const builtin = @import("builtin");
+const list_filter = @import("../list_filter.zig");
 const terminal_color = @import("../terminal/color.zig");
 const selection = @import("selection.zig");
 const row_data = @import("rows.zig");
@@ -249,6 +250,7 @@ pub fn viewAccountsWithLiveUpdates(
     const use_color = terminal_color.fileColorEnabled(tui.output);
     var viewport_start: usize = 0;
     var rendered_row_count: usize = current_display.reg.accounts.items.len;
+    var filter_options = controller.list_filter_options;
     var needs_render = true;
     var last_render_second: i64 = -1;
     var last_rows_minute: i64 = -1;
@@ -272,9 +274,11 @@ pub fn viewAccountsWithLiveUpdates(
             last_rows_minute = now_minute;
         }
         if (needs_render or now_second != last_render_second) {
-            const rows = try rows_cache.ensure(allocator, current_display.borrowed());
+            const rows = try rows_cache.ensureFiltered(allocator, current_display.borrowed(), filter_options);
             rendered_row_count = rows.items.len;
-            const status_line = try controller.build_status_line(controller.context, allocator, current_display.borrowed());
+            const base_status_line = try controller.build_status_line(controller.context, allocator, current_display.borrowed());
+            defer allocator.free(base_status_line);
+            const status_line = try listStatusLineWithFiltersAlloc(allocator, base_status_line, filter_options);
             defer allocator.free(status_line);
             const viewport = live_tui.listViewport(
                 tui.terminalRows(),
@@ -312,7 +316,7 @@ pub fn viewAccountsWithLiveUpdates(
                 if (key_count != 0) {
                     const max_rows = live_tui.maxTableRows(tui.terminalRows(), live_tui.listFixedLines("status"));
                     const wheel_rows = live_tui.mouseWheelRows(max_rows);
-                    const rows = try rows_cache.ensure(allocator, current_display.borrowed());
+                    const rows = try rows_cache.ensureFiltered(allocator, current_display.borrowed(), filter_options);
                     rendered_row_count = rows.items.len;
 
                     for (key_buf[0..key_count]) |key| {
@@ -325,6 +329,40 @@ pub fn viewAccountsWithLiveUpdates(
                             .redraw => needs_render = true,
                             .byte => |ch| {
                                 if (isQuitKey(ch)) return;
+                                if (ch == '0') {
+                                    filter_options.nonzero = !filter_options.nonzero;
+                                    if (filter_options.nonzero) filter_options.errors = false;
+                                    rows_cache.invalidate(allocator);
+                                    viewport_start = 0;
+                                    needs_render = true;
+                                    continue;
+                                }
+                                if (ch == 'a') {
+                                    filter_options.available = !filter_options.available;
+                                    if (filter_options.available) filter_options.errors = false;
+                                    rows_cache.invalidate(allocator);
+                                    viewport_start = 0;
+                                    needs_render = true;
+                                    continue;
+                                }
+                                if (ch == 'e') {
+                                    filter_options.errors = !filter_options.errors;
+                                    if (filter_options.errors) {
+                                        filter_options.available = false;
+                                        filter_options.nonzero = false;
+                                    }
+                                    rows_cache.invalidate(allocator);
+                                    viewport_start = 0;
+                                    needs_render = true;
+                                    continue;
+                                }
+                                if (ch == 'c') {
+                                    filter_options = .{};
+                                    rows_cache.invalidate(allocator);
+                                    viewport_start = 0;
+                                    needs_render = true;
+                                    continue;
+                                }
                             },
                             else => {},
                         }
@@ -333,4 +371,16 @@ pub fn viewAccountsWithLiveUpdates(
             },
         }
     }
+}
+
+fn listStatusLineWithFiltersAlloc(
+    allocator: std.mem.Allocator,
+    base_status_line: []const u8,
+    filter_options: list_filter.Options,
+) ![]u8 {
+    const filter_status = try list_filter.summaryAlloc(allocator, filter_options);
+    defer allocator.free(filter_status);
+    if (filter_status.len == 0) return allocator.dupe(u8, base_status_line);
+    if (base_status_line.len == 0) return allocator.dupe(u8, filter_status);
+    return std.fmt.allocPrint(allocator, "{s} | {s}", .{ base_status_line, filter_status });
 }

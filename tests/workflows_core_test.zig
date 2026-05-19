@@ -4,6 +4,7 @@ const fs = @import("codex_auth").core.compat_fs;
 const account_api = @import("codex_auth").api.account;
 const auth_mod = @import("codex_auth").auth.core;
 const display_rows = @import("codex_auth").tui.display;
+const list_filter = @import("codex_auth").list_filter;
 const main_mod = @import("codex_auth").workflows;
 const registry = @import("codex_auth").registry;
 const usage_api = @import("codex_auth").api.usage;
@@ -93,6 +94,40 @@ fn appendApiKeyAccount(
     });
 }
 
+fn appendAccountWithUsage(
+    allocator: std.mem.Allocator,
+    reg: *registry.Registry,
+    record_key: []const u8,
+    email: []const u8,
+    alias: []const u8,
+    account_name: ?[]const u8,
+    used_percent: f64,
+) !void {
+    const sep = std.mem.lastIndexOf(u8, record_key, "::") orelse return error.InvalidRecordKey;
+    const chatgpt_user_id = record_key[0..sep];
+    const chatgpt_account_id = record_key[sep + 2 ..];
+    try reg.accounts.append(allocator, .{
+        .account_key = try allocator.dupe(u8, record_key),
+        .chatgpt_account_id = try allocator.dupe(u8, chatgpt_account_id),
+        .chatgpt_user_id = try allocator.dupe(u8, chatgpt_user_id),
+        .email = try allocator.dupe(u8, email),
+        .alias = try allocator.dupe(u8, alias),
+        .account_name = if (account_name) |name| try allocator.dupe(u8, name) else null,
+        .plan = .free,
+        .auth_mode = .chatgpt,
+        .created_at = 1,
+        .last_used_at = null,
+        .last_usage = .{
+            .primary = .{ .used_percent = used_percent, .window_minutes = 300, .resets_at = 4_102_444_800 },
+            .secondary = .{ .used_percent = used_percent, .window_minutes = 10080, .resets_at = 4_103_049_600 },
+            .credits = null,
+            .plan_type = .free,
+        },
+        .last_usage_at = 1,
+        .last_local_rollout = null,
+    });
+}
+
 fn writeSnapshot(allocator: std.mem.Allocator, codex_home: []const u8, email: []const u8, plan: []const u8) !void {
     const account_key = try fixtures.accountKeyForEmailAlloc(allocator, email);
     defer allocator.free(account_key);
@@ -130,6 +165,39 @@ fn authJsonWithIds(
         "{{\"tokens\":{{\"access_token\":\"access-{s}\",\"account_id\":\"{s}\",\"id_token\":\"{s}\"}}}}",
         .{ email, chatgpt_account_id, jwt },
     );
+}
+
+test "Scenario: Given account filter options when matching then thresholds errors and query are respected" {
+    const gpa = std.testing.allocator;
+    var reg = makeRegistry();
+    defer reg.deinit(gpa);
+
+    try appendAccountWithUsage(gpa, &reg, primary_record_key, "alpha@example.com", "main", "Alpha Team", 100);
+    try appendAccountWithUsage(gpa, &reg, secondary_record_key, "beta@outlook.com", "backup", "Beta Team", 0);
+    try appendAccount(gpa, &reg, tertiary_record_key, "gamma@example.com", "broken", .free);
+
+    const now: i64 = 1_800_000_000;
+    var overrides = [_]?[]const u8{ null, null, "401 token_expired" };
+
+    const nonzero = try list_filter.filterAccountIndices(gpa, &reg, &overrides, .{ .nonzero = true }, now);
+    defer gpa.free(nonzero);
+    try std.testing.expectEqual(@as(usize, 1), nonzero.len);
+    try std.testing.expectEqual(@as(usize, 1), nonzero[0]);
+
+    const available = try list_filter.filterAccountIndices(gpa, &reg, &overrides, .{ .available = true }, now);
+    defer gpa.free(available);
+    try std.testing.expectEqual(@as(usize, 1), available.len);
+    try std.testing.expectEqual(@as(usize, 1), available[0]);
+
+    const errors = try list_filter.filterAccountIndices(gpa, &reg, &overrides, .{ .errors = true }, now);
+    defer gpa.free(errors);
+    try std.testing.expectEqual(@as(usize, 1), errors.len);
+    try std.testing.expectEqual(@as(usize, 2), errors[0]);
+
+    const query = try list_filter.filterAccountIndices(gpa, &reg, &overrides, .{ .query = "OUTLOOK" }, now);
+    defer gpa.free(query);
+    try std.testing.expectEqual(@as(usize, 1), query.len);
+    try std.testing.expectEqual(@as(usize, 1), query[0]);
 }
 
 fn authJsonWithIdsAndLastRefresh(
@@ -655,7 +723,7 @@ test "Scenario: Given API key registry record with stale snapshot when refreshin
     try std.testing.expect(state.outcomes[0].unchanged);
 }
 
-test "Scenario: Given more than five foreground usage jobs when refreshing usage then pool init is capped at five workers" {
+test "Scenario: Given more than five foreground usage jobs when refreshing usage then pool init uses configured concurrency cap" {
     const gpa = std.testing.allocator;
 
     const Capture = struct {
@@ -700,7 +768,7 @@ test "Scenario: Given more than five foreground usage jobs when refreshing usage
     );
     defer state.deinit(gpa);
 
-    try std.testing.expectEqual(@as(usize, 5), Capture.observed_jobs);
+    try std.testing.expectEqual(@as(usize, 7), Capture.observed_jobs);
     try std.testing.expectEqual(@as(usize, 7), state.attempted);
     try std.testing.expectEqual(@as(usize, 0), state.failed);
 }

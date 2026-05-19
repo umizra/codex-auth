@@ -155,7 +155,7 @@ pub fn buildSwitchRowsWithUsageOverrides(
     };
 }
 
-fn buildSwitchRowsFromIndices(
+pub fn buildSwitchRowsFromIndices(
     allocator: std.mem.Allocator,
     reg: *registry.Registry,
     indices: []const usize,

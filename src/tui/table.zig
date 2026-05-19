@@ -38,14 +38,26 @@ pub fn printAccountsWithUsageOverrides(
     reg: *registry.Registry,
     usage_overrides: ?[]const ?[]const u8,
 ) !void {
-    try printAccountsTable(reg, usage_overrides);
+    try printAccountsTable(reg, usage_overrides, null);
 }
 
-fn printAccountsTable(reg: *registry.Registry, usage_overrides: ?[]const ?[]const u8) !void {
+pub fn printAccountsWithUsageOverridesAndIndices(
+    reg: *registry.Registry,
+    usage_overrides: ?[]const ?[]const u8,
+    account_indices: ?[]const usize,
+) !void {
+    try printAccountsTable(reg, usage_overrides, account_indices);
+}
+
+fn printAccountsTable(
+    reg: *registry.Registry,
+    usage_overrides: ?[]const ?[]const u8,
+    account_indices: ?[]const usize,
+) !void {
     var stdout: io_util.Stdout = undefined;
     stdout.init();
     const out = stdout.out();
-    try writeAccountsTableWithUsageOverrides(out, reg, colorEnabled(), usage_overrides);
+    try writeAccountsTableWithUsageOverridesAndIndices(out, reg, colorEnabled(), usage_overrides, account_indices);
     try out.flush();
 }
 
@@ -87,6 +99,16 @@ pub fn writeAccountsTableWithUsageOverrides(
     use_color: bool,
     usage_overrides: ?[]const ?[]const u8,
 ) !void {
+    try writeAccountsTableWithUsageOverridesAndIndices(out, reg, use_color, usage_overrides, null);
+}
+
+pub fn writeAccountsTableWithUsageOverridesAndIndices(
+    out: *std.Io.Writer,
+    reg: *registry.Registry,
+    use_color: bool,
+    usage_overrides: ?[]const ?[]const u8,
+    account_indices: ?[]const usize,
+) !void {
     const headers = [_][]const u8{ "ACCOUNT", "PLAN", "5H", "WEEKLY", "LAST ACTIVITY" };
     var widths = [_]usize{
         headers[0].len,
@@ -96,7 +118,7 @@ pub fn writeAccountsTableWithUsageOverrides(
         headers[4].len,
     };
     const now = std.Io.Timestamp.now(app_runtime.io(), .real).toSeconds();
-    var display = try display_rows.buildDisplayRows(std.heap.page_allocator, reg, null);
+    var display = try display_rows.buildDisplayRows(std.heap.page_allocator, reg, account_indices);
     defer display.deinit(std.heap.page_allocator);
     const idx_width = @max(@as(usize, 2), indexWidth(display.selectable_row_indices.len));
     const prefix_len: usize = 2 + idx_width + 1;

@@ -276,6 +276,45 @@ test "Scenario: Given list with api flag when parsing then forced api mode is pr
     }
 }
 
+test "Scenario: Given list filter flags when parsing then filters are preserved" {
+    const gpa = std.testing.allocator;
+    const args = [_][:0]const u8{ "codex-auth", "list", "--nonzero", "--min", "10", "--query", "outlook", "--skip-api" };
+    var result = try cli.commands.parseArgs(gpa, &args);
+    defer cli.commands.freeParseResult(gpa, &result);
+
+    switch (result) {
+        .command => |cmd| switch (cmd) {
+            .list => |opts| {
+                try std.testing.expect(opts.nonzero);
+                try std.testing.expectEqual(@as(?u8, 10), opts.min_percent);
+                try std.testing.expect(opts.query != null);
+                try std.testing.expectEqualStrings("outlook", opts.query.?);
+                try std.testing.expectEqual(cli.types.ApiMode.skip_api, opts.api_mode);
+            },
+            else => return error.TestExpectedEqual,
+        },
+        else => return error.TestExpectedEqual,
+    }
+}
+
+test "Scenario: Given list available and errors together when parsing then usage error is returned" {
+    const gpa = std.testing.allocator;
+    const args = [_][:0]const u8{ "codex-auth", "list", "--available", "--errors" };
+    var result = try cli.commands.parseArgs(gpa, &args);
+    defer cli.commands.freeParseResult(gpa, &result);
+
+    try expectUsageError(result, .list, "cannot be combined");
+}
+
+test "Scenario: Given list min without valid percent when parsing then usage error is returned" {
+    const gpa = std.testing.allocator;
+    const args = [_][:0]const u8{ "codex-auth", "list", "--min", "101" };
+    var result = try cli.commands.parseArgs(gpa, &args);
+    defer cli.commands.freeParseResult(gpa, &result);
+
+    try expectUsageError(result, .list, "percentage");
+}
+
 test "Scenario: Given login with removed no-login flag when parsing then usage error is returned" {
     const gpa = std.testing.allocator;
     const args = [_][:0]const u8{ "codex-auth", "login", "--no-login" };
@@ -336,7 +375,7 @@ test "Scenario: Given help when rendering then login and command help notes are 
 
     const help = aw.written();
     try std.testing.expect(std.mem.indexOf(u8, help, "Commands:") != null);
-    try std.testing.expect(std.mem.indexOf(u8, help, "list [--live] [--active] [--api|--skip-api]") != null);
+    try std.testing.expect(std.mem.indexOf(u8, help, "list [--live] [--active]") != null);
     try std.testing.expect(std.mem.indexOf(u8, help, "batch-login <path> [--line <n>|--from-line <n>] [--device-auth]") != null);
     try std.testing.expect(std.mem.indexOf(u8, help, "switch [--live] [--api|--skip-api]") != null);
     try std.testing.expect(std.mem.indexOf(u8, help, "alias set <alias|email|display-number|query> <alias>") != null);
@@ -354,10 +393,11 @@ test "Scenario: Given simple command help when rendering then examples are omitt
     const help = aw.written();
     try std.testing.expect(std.mem.indexOf(u8, help, "codex-auth list") != null);
     try std.testing.expect(std.mem.indexOf(u8, help, "List available accounts.") != null);
-    try std.testing.expect(std.mem.indexOf(u8, help, "Usage:\n  codex-auth list [--live] [--active] [--api|--skip-api]\n") != null);
+    try std.testing.expect(std.mem.indexOf(u8, help, "Usage:\n  codex-auth list [--live] [--active]") != null);
     try std.testing.expect(std.mem.indexOf(u8, help, "Options:\n  --live") != null);
-    try std.testing.expect(std.mem.indexOf(u8, help, "--active     Refresh only the active account before rendering.") != null);
-    try std.testing.expect(std.mem.indexOf(u8, help, "--skip-api   Load usage and account data from local data only (may be inaccurate).") != null);
+    try std.testing.expect(std.mem.indexOf(u8, help, "--active          Refresh only the active account before rendering.") != null);
+    try std.testing.expect(std.mem.indexOf(u8, help, "--available       Show only accounts that look usable.") != null);
+    try std.testing.expect(std.mem.indexOf(u8, help, "--skip-api        Load usage and account data from local data only (may be inaccurate).") != null);
     try std.testing.expect(std.mem.indexOf(u8, help, "Examples:") == null);
 }
 

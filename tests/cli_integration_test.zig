@@ -2194,6 +2194,76 @@ test "Scenario: Given list with skip-api when running list then it does not requ
     try std.testing.expectEqualStrings("", result.stderr);
 }
 
+test "Scenario: Given cached usage when running list filters then output only includes matching accounts" {
+    const gpa = std.testing.allocator;
+    const project_root = try projectRootAlloc(gpa);
+    defer gpa.free(project_root);
+    try buildCliBinary(gpa, project_root);
+
+    var tmp = fs.tmpDir(.{});
+    defer tmp.cleanup();
+
+    const home_root = try tmp.dir.realpathAlloc(gpa, ".");
+    defer gpa.free(home_root);
+
+    try seedRegistryWithAccounts(gpa, home_root, "alpha@example.com", &[_]SeedAccount{
+        .{ .email = "alpha@example.com", .alias = "empty" },
+        .{ .email = "beta@outlook.com", .alias = "usable" },
+        .{ .email = "gamma@example.com", .alias = "missing" },
+    });
+    try setStoredUsageSnapshotForAccount(gpa, home_root, "alpha@example.com", makeUsageSnapshot(100, 100), 1, 0);
+    try setStoredUsageSnapshotForAccount(gpa, home_root, "beta@outlook.com", makeUsageSnapshot(0, 0), 1, 0);
+
+    try tmp.dir.makePath("empty-bin");
+    const empty_path = try tmp.dir.realpathAlloc(gpa, "empty-bin");
+    defer gpa.free(empty_path);
+
+    const nonzero = try runCliWithIsolatedHomeAndPath(
+        gpa,
+        project_root,
+        home_root,
+        empty_path,
+        &[_][]const u8{ "list", "--skip-api", "--nonzero" },
+    );
+    defer gpa.free(nonzero.stdout);
+    defer gpa.free(nonzero.stderr);
+
+    try expectSuccess(nonzero);
+    try std.testing.expect(std.mem.indexOf(u8, nonzero.stdout, "beta@outlook.com") != null);
+    try std.testing.expect(std.mem.indexOf(u8, nonzero.stdout, "alpha@example.com") == null);
+    try std.testing.expect(std.mem.indexOf(u8, nonzero.stdout, "gamma@example.com") == null);
+
+    const errors = try runCliWithIsolatedHomeAndPath(
+        gpa,
+        project_root,
+        home_root,
+        empty_path,
+        &[_][]const u8{ "list", "--skip-api", "--errors" },
+    );
+    defer gpa.free(errors.stdout);
+    defer gpa.free(errors.stderr);
+
+    try expectSuccess(errors);
+    try std.testing.expect(std.mem.indexOf(u8, errors.stdout, "gamma@example.com") != null);
+    try std.testing.expect(std.mem.indexOf(u8, errors.stdout, "alpha@example.com") == null);
+    try std.testing.expect(std.mem.indexOf(u8, errors.stdout, "beta@outlook.com") == null);
+
+    const query = try runCliWithIsolatedHomeAndPath(
+        gpa,
+        project_root,
+        home_root,
+        empty_path,
+        &[_][]const u8{ "list", "--skip-api", "--available", "--query", "outlook" },
+    );
+    defer gpa.free(query.stdout);
+    defer gpa.free(query.stderr);
+
+    try expectSuccess(query);
+    try std.testing.expect(std.mem.indexOf(u8, query.stdout, "beta@outlook.com") != null);
+    try std.testing.expect(std.mem.indexOf(u8, query.stdout, "alpha@example.com") == null);
+    try std.testing.expect(std.mem.indexOf(u8, query.stdout, "gamma@example.com") == null);
+}
+
 test "Scenario: Given switch query with api flag when running switch then it returns a usage error" {
     const gpa = std.testing.allocator;
     const project_root = try projectRootAlloc(gpa);

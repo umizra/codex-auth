@@ -1,4 +1,5 @@
 const std = @import("std");
+const list_filter = @import("../list_filter.zig");
 const registry = @import("../registry/root.zig");
 
 pub const SwitchSelectionDisplay = struct {
@@ -29,6 +30,7 @@ pub const OwnedSwitchSelectionDisplay = struct {
 
 pub const SwitchLiveController = struct {
     context: *anyopaque,
+    list_filter_options: list_filter.Options = .{},
     maybe_start_refresh: *const fn (context: *anyopaque) anyerror!void,
     maybe_take_updated_display: *const fn (context: *anyopaque) anyerror!?OwnedSwitchSelectionDisplay,
     build_status_line: *const fn (

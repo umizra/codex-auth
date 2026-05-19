@@ -8,6 +8,11 @@ pub const ListOptions = struct {
     live: bool = false,
     api_mode: ApiMode = .default,
     active_only: bool = false,
+    nonzero: bool = false,
+    available: bool = false,
+    min_percent: ?u8 = null,
+    errors: bool = false,
+    query: ?[]u8 = null,
 };
 pub const LoginOptions = struct {
     device_auth: bool = false,

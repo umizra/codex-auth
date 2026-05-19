@@ -193,7 +193,7 @@ fn writeUsageLines(out: *std.Io.Writer, topic: HelpTopic) !void {
             try out.writeAll("  codex-auth --help\n");
             try out.writeAll("  codex-auth help <command>\n");
         },
-        .list => try out.writeAll("  codex-auth list [--live] [--active] [--api|--skip-api]\n"),
+        .list => try out.writeAll("  codex-auth list [--live] [--active] [--nonzero|--available|--errors] [--min <percent>] [--query <text>] [--api|--skip-api]\n"),
         .login => {
             try out.writeAll("  codex-auth login\n");
             try out.writeAll("  codex-auth login --device-auth\n");
@@ -262,10 +262,15 @@ fn writeOptionsSectionStyled(out: *std.Io.Writer, use_color: bool, topic: HelpTo
 fn writeOptionLines(out: *std.Io.Writer, topic: HelpTopic) !void {
     switch (topic) {
         .list => {
-            try out.writeAll("  --live       Open a live-updating table.\n");
-            try out.writeAll("  --active     Refresh only the active account before rendering.\n");
-            try out.writeAll("  --api        Load usage and account data from APIs.\n");
-            try out.writeAll("  --skip-api   Load usage and account data from local data only (may be inaccurate).\n");
+            try out.writeAll("  --live            Open a live-updating table.\n");
+            try out.writeAll("  --active          Refresh only the active account before rendering.\n");
+            try out.writeAll("  --nonzero         Hide exhausted accounts.\n");
+            try out.writeAll("  --available       Show only accounts that look usable.\n");
+            try out.writeAll("  --min <percent>   Show accounts with at least this usage percentage.\n");
+            try out.writeAll("  --errors          Show only accounts with missing or errored usage.\n");
+            try out.writeAll("  --query <text>    Filter by email, alias, account name, or key.\n");
+            try out.writeAll("  --api             Load usage and account data from APIs.\n");
+            try out.writeAll("  --skip-api        Load usage and account data from local data only (may be inaccurate).\n");
         },
         .login => {
             try out.writeAll("  --device-auth   Run `codex login --device-auth` before adding the account.\n");
@@ -337,6 +342,8 @@ fn writeExampleLines(out: *std.Io.Writer, topic: HelpTopic) !void {
             try out.writeAll("  codex-auth list --live\n");
             try out.writeAll("  codex-auth list --api\n");
             try out.writeAll("  codex-auth list --skip-api\n");
+            try out.writeAll("  codex-auth list --available --skip-api\n");
+            try out.writeAll("  codex-auth list --min 10 --query outlook\n");
         },
         .login => {
             try out.writeAll("  codex-auth login\n");

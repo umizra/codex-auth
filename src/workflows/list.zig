@@ -1,9 +1,11 @@
 const std = @import("std");
+const app_runtime = @import("../core/runtime.zig");
 const cli = @import("../cli/root.zig");
 const format = @import("../tui/table.zig");
 const registry = @import("../registry/root.zig");
 const account_names = @import("account_names.zig");
 const live_flow = @import("live.zig");
+const list_filter = @import("../list_filter.zig");
 const preflight = @import("preflight.zig");
 const usage_refresh = @import("usage.zig");
 
@@ -45,6 +47,7 @@ pub fn handleList(allocator: std.mem.Allocator, codex_home: []const u8, opts: cl
 
         const controller: cli.live.SwitchLiveController = .{
             .context = @ptrCast(&runtime),
+            .list_filter_options = listFilterOptionsFromCli(opts),
             .maybe_start_refresh = switchLiveRuntimeMaybeStartRefresh,
             .maybe_take_updated_display = switchLiveRuntimeMaybeTakeUpdatedDisplay,
             .build_status_line = switchLiveRuntimeBuildStatusLine,
@@ -96,5 +99,30 @@ pub fn handleList(allocator: std.mem.Allocator, codex_home: []const u8, opts: cl
         defaultAccountFetcher,
         account_api_enabled,
     );
-    try format.printAccountsWithUsageOverrides(&reg, usage_state.usage_overrides);
+    const filter_opts = listFilterOptionsFromCli(opts);
+    if (filter_opts.isEmpty()) {
+        try format.printAccountsWithUsageOverrides(&reg, usage_state.usage_overrides);
+        return;
+    }
+
+    const now = std.Io.Timestamp.now(app_runtime.io(), .real).toSeconds();
+    const filtered_indices = try list_filter.filterAccountIndices(
+        allocator,
+        &reg,
+        usage_state.usage_overrides,
+        filter_opts,
+        now,
+    );
+    defer allocator.free(filtered_indices);
+    try format.printAccountsWithUsageOverridesAndIndices(&reg, usage_state.usage_overrides, filtered_indices);
+}
+
+fn listFilterOptionsFromCli(opts: cli.types.ListOptions) list_filter.Options {
+    return .{
+        .nonzero = opts.nonzero,
+        .available = opts.available,
+        .min_percent = opts.min_percent,
+        .errors = opts.errors,
+        .query = opts.query,
+    };
 }
