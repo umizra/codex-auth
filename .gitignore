@@ -9,3 +9,6 @@ dist/
 
 # Local benchmarking workspace
 benchmark/*
+
+# Local brainstorming workspace
+.superpowers/
